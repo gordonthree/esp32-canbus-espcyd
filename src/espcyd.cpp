@@ -26,6 +26,9 @@ volatile bool newData = false;
 extern volatile bool can_suspended;
 extern volatile bool can_driver_installed;
 
+/* Define task handles */
+TaskHandle_t xDisplayHandle = NULL;
+TaskHandle_t xTouchHandle = NULL;
 
 /* Variables for the color picker routines - from main.cpp*/
 DisplayMode currentMode = MODE_HOME; /**< Current display mode */
@@ -79,12 +82,9 @@ void initCYD() {
     touchscreen.begin(touchscreenSPI);
     touchscreen.setRotation(1);
   
-    /* Add a node to the ARGB list, for testing purposes */
-    registerARGBNode(0x25A56D84);
-
     /* Start the tasks */
-    xTaskCreate(TaskReadTouch, "TouchTask", 4096, NULL, 2, NULL);
-    xTaskCreate(TaskUpdateDisplay, "DisplayTask", 6144, NULL, 1, NULL);
+    xTaskCreate(TaskReadTouch, "TouchTask", 4096, NULL, 2, &xTouchHandle);          /* assign task handles */
+    xTaskCreate(TaskUpdateDisplay, "DisplayTask", 6144, NULL, 1, &xDisplayHandle);
 }
 
 /**
@@ -503,7 +503,7 @@ void TaskReadTouch(void * pvParameters) {
   for(;;) {
     /* Only process touch if CAN is healthy and not suspended */
     if (can_driver_installed && !can_suspended) {
-      digitalWrite(LED_GREEN, !digitalRead(LED_GREEN)); /* Toggle the green LED */
+    //   digitalWrite(LED_RED, digitalRead(LED_RED) ^ 1); /* Toggle RED LED */
 
       /* Try to take the mutex (wait up to 10ms if busy) */
       if (touchscreen.tirqTouched() && touchscreen.touched()) {
@@ -560,14 +560,10 @@ void TaskUpdateDisplay(void * pvParameters) {
     /* STATE 1: Waiting for CAN Introduction Acknowledgement */
     if (!ui_initialized) {
         if (xSemaphoreTake(spiSemaphore, pdMS_TO_TICKS(10)) == pdTRUE) {
-            if (FLAG_SEND_INTRODUCTION) {
-                drawHeader("Waiting for connection");
-            } else {
-                drawKeypad();
-                /* Draw footer immediately upon entry to main UI */
-                if (wifi_connected) drawFooter();
-                ui_initialized = true;
-            }
+            drawKeypad();
+            /* Draw footer immediately upon entry to main UI */
+            if (wifi_connected) drawFooter();
+            ui_initialized = true;
             xSemaphoreGive(spiSemaphore);
         }
         vTaskDelay(pdMS_TO_TICKS(100));
@@ -580,28 +576,31 @@ void TaskUpdateDisplay(void * pvParameters) {
         lastTimeUpdate = currentMillis;
 
         /* Check for stale nodes */
+        lastTimeUpdate = currentMillis;
+
+        bool stateChanged = false;
         for (int i = 0; i < 5; i++) {
-            if (discoveredNodes[i].id != 0 && (currentMillis - discoveredNodes[i].lastSeen > 30000)) {
-                discoveredNodes[i].active = false;
+            if (discoveredNodes[i].id != 0) {
+                /** * If node was active but hasn't been seen for > 10s, 
+                 * mark as inactive and trigger a UI refresh.
+                 */
+                if (discoveredNodes[i].active && (currentMillis - discoveredNodes[i].lastSeen > 10000)) {
+                    discoveredNodes[i].active = false;
+                    stateChanged = true;
+                    Serial.printf("Node 0x%08X timed out.\n", discoveredNodes[i].id);
+                }
             }
         }
 
-        /* ONLY perform a full redraw if we are on the System Info screen 
-           (to update the clock/RSSI) or if the footer needs its first draw */
         if (xSemaphoreTake(spiSemaphore, pdMS_TO_TICKS(50)) == pdTRUE) {
-            
-            if (currentMode == MODE_SYSTEM_INFO) {
-                drawSystemInfo();
+            /* Refresh current screen if a node dropped or if in System Info */
+            if (stateChanged || currentMode == MODE_SYSTEM_INFO || currentMode == MODE_NODE_SEL) {
+                refreshCurrentScreen();
             }
-
-            /* Footer Update (only once at startup) */
-            if (wifi_connected && !footer_drawn) {
-                drawFooter();
-                footer_drawn = true;
-            }
-            
             xSemaphoreGive(spiSemaphore);
         }
+
+
     } /* End 1000ms refresh loop */
     
     /* Check for Touch Data */

@@ -59,6 +59,12 @@ extern TFT_eSPI tft;
 
 extern String wifiIP; /**< Refers to the String defined in main.cpp */
 
+
+/* Task handles */
+extern TaskHandle_t xDisplayHandle; /* task in espcyd.cpp */
+extern TaskHandle_t xTouchHandle;   /* task in espcyd.cpp */
+
+
 /* Set X and Y coordinates for center of display */
 const int centerX = SCREEN_WIDTH / 2;
 const int centerY = SCREEN_HEIGHT / 2;
