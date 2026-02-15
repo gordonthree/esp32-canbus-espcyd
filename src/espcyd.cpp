@@ -581,10 +581,10 @@ void TaskUpdateDisplay(void * pvParameters) {
         bool stateChanged = false;
         for (int i = 0; i < 5; i++) {
             if (discoveredNodes[i].id != 0) {
-                /** * If node was active but hasn't been seen for > 10s, 
+                /** * If node was active but hasn't been seen for > 30s, 
                  * mark as inactive and trigger a UI refresh.
                  */
-                if (discoveredNodes[i].active && (currentMillis - discoveredNodes[i].lastSeen > 10000)) {
+                if (discoveredNodes[i].active && (currentMillis - discoveredNodes[i].lastSeen > 30000)) {
                     discoveredNodes[i].active = false;
                     stateChanged = true;
                     Serial.printf("Node 0x%08X timed out.\n", discoveredNodes[i].id);
@@ -594,7 +594,7 @@ void TaskUpdateDisplay(void * pvParameters) {
 
         if (xSemaphoreTake(spiSemaphore, pdMS_TO_TICKS(50)) == pdTRUE) {
             /* Refresh current screen if a node dropped or if in System Info */
-            if (stateChanged || currentMode == MODE_SYSTEM_INFO || currentMode == MODE_NODE_SEL) {
+            if ((currentMode == MODE_SYSTEM_INFO) || (stateChanged && currentMode == MODE_NODE_SEL)) {
                 refreshCurrentScreen();
             }
             xSemaphoreGive(spiSemaphore);
