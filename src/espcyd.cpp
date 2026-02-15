@@ -391,7 +391,10 @@ void drawKeypad() {
 }
 
 /**
- * @brief Draws the node selection screen with a consistent header
+ * @brief Draws the node selection screen with color-coded node states.
+ * - Yellow: Currently selected node.
+ * - White: Active (but not selected) node.
+ * - Light Grey: Inactive node.
  */
 void drawNodeSelector() {
     /* 1. Draw the standard blue header */
@@ -399,36 +402,47 @@ void drawNodeSelector() {
     tft.setTextColor(TFT_WHITE, TFT_BLUE);
     tft.drawCentreString("SELECT TARGET NODE", 160, 10, 2);
     
-    /* Draw standard navigation icons in header */
-    drawPickerIcon();    /**< Left toggle icon */
-    drawHamburgerIcon(); /**< Right menu icon */
+    drawPickerIcon();
+    drawHamburgerIcon();
 
     /* 2. Draw the Content Area */
     tft.fillRect(0, 44, 320, 196, TFT_BLACK);
 
     for (int i = 0; i < 5; i++) {
         int yPos = 50 + (i * 38);
-        uint16_t boxColor = (selectedNodeIdx == i) ? TFT_YELLOW : TFT_BLACK;
         
-        /* Draw selection row container */
-        tft.drawRect(5, yPos - 2, 310, 34, boxColor);
+        /* Highlight the selection box in yellow if selected, otherwise black/invisible */
+        uint16_t boxOutlineColor = (selectedNodeIdx == i) ? TFT_YELLOW : TFT_BLACK;
+        tft.drawRect(5, yPos - 2, 310, 34, boxOutlineColor);
 
         if (discoveredNodes[i].id != 0) {
-            char buf[25];
-            sprintf(buf, "[%d] ID: 0x%08X", i, discoveredNodes[i].id);
-            tft.setTextColor(discoveredNodes[i].active ? TFT_WHITE : TFT_LIGHTGREY);
+            /* Determine Text Color based on selection and activity */
+            uint16_t txtCol;
+            if (selectedNodeIdx == i) {
+                txtCol = TFT_YELLOW;
+            } else if (discoveredNodes[i].active) {
+                txtCol = TFT_WHITE;
+            } else {
+                txtCol = TFT_LIGHTGREY;
+            }
+
+            tft.setTextColor(txtCol, TFT_BLACK);
+            char buf[30];
+            sprintf(buf, "[%d] ID: 0x%08X %s", i, discoveredNodes[i].id, 
+                    discoveredNodes[i].active ? "" : "(OFFLINE)");
             tft.drawString(buf, 15, yPos + 8, 2);
 
-            /* Small square showing the last sent color */
+            /* Preview square for the last color sent to this node */
             int cIdx = discoveredNodes[i].lastColorIdx;
             uint16_t previewColor = tft.color565(SystemPalette[cIdx].r, 
                                                  SystemPalette[cIdx].g, 
                                                  SystemPalette[cIdx].b);
             
             tft.fillRect(280, yPos + 5, 20, 20, previewColor);
-            tft.drawRect(280, yPos + 5, 20, 20, TFT_WHITE);
+            /* Draw a border around the color box; make it dark if node is inactive */
+            tft.drawRect(280, yPos + 5, 20, 20, discoveredNodes[i].active ? TFT_WHITE : TFT_DARKGREY);
         } else {
-            tft.setTextColor(TFT_DARKGREY);
+            tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
             tft.drawString("--- Empty Slot ---", 15, yPos + 8, 2);
         }
     }
