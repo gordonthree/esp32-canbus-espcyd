@@ -88,6 +88,15 @@ void initCYD() {
 }
 
 /**
+ * @brief Implementation of RgbColor to RGB565 conversion.
+ */
+uint16_t colorTo565(RgbColor color) 
+{
+    /* Scale 8-bit color channels to 5-6-5 bit depths */
+    return ((color.R & 0xF8) << 8) | ((color.G & 0xFC) << 3) | (color.B >> 3);
+}
+
+/**
  * @brief Draws the hamburger icon in the top-right
  */
 void drawHamburgerIcon() {
@@ -356,7 +365,7 @@ void drawColorPicker() {
         int x = col * swatchW;
         int y = startY + (row * swatchH);
 
-        uint16_t color565 = tft.color565(SystemPalette[i].r, SystemPalette[i].g, SystemPalette[i].b);
+        uint16_t color565 = colorTo565(SystemPalette[i]);
         tft.fillRect(x, y, swatchW, swatchH, color565);
         
         /* Draw selection highlight if this is the active color */
@@ -434,9 +443,7 @@ void drawNodeSelector() {
 
             /* Preview square for the last color sent to this node */
             int cIdx = discoveredNodes[i].lastColorIdx;
-            uint16_t previewColor = tft.color565(SystemPalette[cIdx].r, 
-                                                 SystemPalette[cIdx].g, 
-                                                 SystemPalette[cIdx].b);
+            uint16_t previewColor = tft.color565(SystemPalette[i].R, SystemPalette[i].G, SystemPalette[i].B);
             
             tft.fillRect(280, yPos + 5, 20, 20, previewColor);
             /* Draw a border around the color box; make it dark if node is inactive */

@@ -74,6 +74,13 @@ const int centerY = SCREEN_HEIGHT / 2;
 void initCYD();
 void registerARGBNode(uint32_t id);
 
+/**
+ * @brief Converts a NeoPixelBus RgbColor to a 16-bit RGB565 value for the TFT.
+ * @param color The RgbColor to convert.
+ * @return uint16_t The color in RGB565 format.
+ */
+uint16_t colorTo565(RgbColor color);
+
 struct TouchData {
   int x;
   int y;
