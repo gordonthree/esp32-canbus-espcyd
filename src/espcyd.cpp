@@ -90,7 +90,7 @@ void initCYD() {
 /**
  * @brief Implementation of RgbColor to RGB565 conversion.
  */
-uint16_t colorTo565(RgbColor color) 
+uint16_t colorTo565(PaletteColor color) 
 {
     /* Scale 8-bit color channels to 5-6-5 bit depths */
     return ((color.R & 0xF8) << 8) | ((color.G & 0xFC) << 3) | (color.B >> 3);
@@ -284,6 +284,7 @@ void registerARGBNode(uint32_t id) {
     }
 }
 
+
 /**
  * @brief Draws a simple splash screen while waiting for CAN sync
  */
@@ -364,8 +365,9 @@ void drawColorPicker() {
         int row = i / 8;
         int x = col * swatchW;
         int y = startY + (row * swatchH);
+        PaletteColor pColor = SystemPalette[i];
 
-        uint16_t color565 = colorTo565(SystemPalette[i]);
+        uint16_t color565 = colorTo565(pColor);
         tft.fillRect(x, y, swatchW, swatchH, color565);
         
         /* Draw selection highlight if this is the active color */

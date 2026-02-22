@@ -79,7 +79,7 @@ void registerARGBNode(uint32_t id);
  * @param color The RgbColor to convert.
  * @return uint16_t The color in RGB565 format.
  */
-uint16_t colorTo565(RgbColor color);
+uint16_t colorTo565(PaletteColor color);
 
 struct TouchData {
   int x;
