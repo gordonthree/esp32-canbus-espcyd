@@ -54,6 +54,9 @@
 #define CYD_LDR           34
 #define CYD_SPEAKER       26
 
+/** ARGB constants */
+#define MAX_ARGB_NODES    8
+
 /* Externalized variables for use in main logic if needed */
 extern TFT_eSPI tft;
 
@@ -69,10 +72,10 @@ extern TaskHandle_t xTouchHandle;   /* task in espcyd.cpp */
 const int centerX = SCREEN_WIDTH / 2;
 const int centerY = SCREEN_HEIGHT / 2;
 
-
 /* Modular initialization function */
 void initCYD();
-void registerARGBNode(uint32_t id);
+// void registerARGBNode(uint32_t id);
+
 
 /**
  * @brief Converts a NeoPixelBus RgbColor to a 16-bit RGB565 value for the TFT.
@@ -126,8 +129,8 @@ struct ARGBNode {
     bool active;       /**< Status flag */
 };
 
-extern ARGBNode discoveredNodes[5]; /**< Support up to 5 ARGB nodes */
-extern int selectedNodeIdx;
-
+extern volatile int   discoveredNodeCount; /**< Track active count in the array */
+extern volatile int   selectedNodeIdx;
+extern ARGBNode discoveredNodes[MAX_ARGB_NODES]; /**< Size must be explicit here */
 
 #endif  /* End ESPCYD_H_ */

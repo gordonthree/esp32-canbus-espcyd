@@ -22,6 +22,12 @@ int x, y, z;
 volatile int globalX, globalY, globalZ;
 volatile bool newData = false;
 
+/* Match the header exactly: volatile and explicit size */
+volatile int discoveredNodeCount = 0;
+volatile int selectedNodeIdx = 0;
+
+ARGBNode discoveredNodes[MAX_ARGB_NODES];
+
 /* CAN interface status from main.cpp */
 extern volatile bool can_suspended;
 extern volatile bool can_driver_installed;
@@ -32,13 +38,11 @@ TaskHandle_t xTouchHandle = NULL;
 
 /* Variables for the color picker routines - from main.cpp*/
 DisplayMode currentMode = MODE_HOME; /**< Current display mode */
-int selectedNodeIdx = 0;     /**< Currently targeted node for color commands */
-ARGBNode discoveredNodes[5]; /**< List of discovered ARGB nodes */
 
 /* can tx function in main.cpp */
 extern void send_message(uint16_t msgid, uint8_t *data, uint8_t dlc);
 
-/* node ID for the data payload */
+/* node ID for the data payload from main CPP */
 extern volatile uint8_t myNodeID[4];
 
 extern bool wifi_connected;
@@ -409,51 +413,62 @@ void drawKeypad() {
  */
 void drawNodeSelector() {
     /* 1. Draw the standard blue header */
-    tft.fillRect(0, 0, 320, 43, TFT_BLUE);
-    tft.setTextColor(TFT_WHITE, TFT_BLUE);
-    tft.drawCentreString("SELECT TARGET NODE", 160, 10, 2);
-    
-    drawPickerIcon();
-    drawHamburgerIcon();
+    // tft.fillRect(0, 0, 320, 43, TFT_BLUE);
+    // tft.setTextColor(TFT_WHITE, TFT_BLUE);
+    // tft.drawCentreString("SELECT TARGET NODE", 160, 10, 2);
+    drawHeader("SELECT TARGET NODE");
+    // drawPickerIcon();
+    // drawHamburgerIcon();
 
     /* 2. Draw the Content Area */
     tft.fillRect(0, 44, 320, 196, TFT_BLACK);
 
-    for (int i = 0; i < 5; i++) {
-        int yPos = 50 + (i * 38);
-        
-        /* Highlight the selection box in yellow if selected, otherwise black/invisible */
-        uint16_t boxOutlineColor = (selectedNodeIdx == i) ? TFT_YELLOW : TFT_BLACK;
-        tft.drawRect(5, yPos - 2, 310, 34, boxOutlineColor);
+ /* 2. Content Area Setup */
+    const uint16_t headerHeight = 44;               /**< Space reserved for header */
+    const uint16_t contentHeight = 240 - headerHeight; /**< 196 pixels remaining */
+    
+    const uint8_t  cols = 4;
+    const uint8_t  rows = 2;
+    const uint16_t btnW = 320 / cols;               /**< 80 pixels wide */
+    const uint16_t btnH = contentHeight / rows;     /**< 98 pixels high */
 
-        if (discoveredNodes[i].id != 0) {
-            /* Determine Text Color based on selection and activity */
-            uint16_t txtCol;
-            if (selectedNodeIdx == i) {
-                txtCol = TFT_YELLOW;
-            } else if (discoveredNodes[i].active) {
-                txtCol = TFT_WHITE;
-            } else {
-                txtCol = TFT_LIGHTGREY;
-            }
+    tft.fillRect(0, headerHeight, 320, contentHeight, TFT_BLACK);
 
-            tft.setTextColor(txtCol, TFT_BLACK);
-            char buf[30];
-            sprintf(buf, "[%d] ID: 0x%08X %s", i, discoveredNodes[i].id, 
-                    discoveredNodes[i].active ? "" : "(OFFLINE)");
-            tft.drawString(buf, 15, yPos + 8, 2);
+    for (int i = 0; i < discoveredNodeCount; i++) {
+        /* Calculate grid coordinates relative to content area */
+        int col = i % cols;
+        int row = i / cols;
+        int x = col * btnW;
+        int y = headerHeight + (row * btnH);
 
-            /* Preview square for the last color sent to this node */
-            int cIdx = discoveredNodes[i].lastColorIdx;
-            uint16_t previewColor = tft.color565(SystemPalette[i].R, SystemPalette[i].G, SystemPalette[i].B);
-            
-            tft.fillRect(280, yPos + 5, 20, 20, previewColor);
-            /* Draw a border around the color box; make it dark if node is inactive */
-            tft.drawRect(280, yPos + 5, 20, 20, discoveredNodes[i].active ? TFT_WHITE : TFT_DARKGREY);
-        } else {
-            tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-            tft.drawString("--- Empty Slot ---", 15, yPos + 8, 2);
+        /* Truncate Node ID to last 2 bytes */
+        char label[8];
+        sprintf(label, "0x%04X", (uint16_t)(discoveredNodes[i].id & 0xFFFF));
+
+        /* Resolve background color from the saved index */
+        uint16_t bgColor = TFT_BLACK;
+        int idx = discoveredNodes[i].lastColorIdx;
+        if (idx >= 0 && idx < COLOR_PALETTE_SIZE) {
+            bgColor = colorTo565(SystemPalette[idx]);
         }
+
+        /* Draw Button Body */
+        tft.fillRect(x + 2, y + 2, btnW - 4, btnH - 4, bgColor);
+        
+        /* Contrast border and selection highlight */
+        uint16_t borderColor = (i == selectedNodeIdx) ? TFT_YELLOW : 
+                               (bgColor < 0x2104) ? TFT_DARKGREY : TFT_WHITE;
+        
+        tft.drawRect(x + 2, y + 2, btnW - 4, btnH - 4, borderColor);
+        if (i == selectedNodeIdx) {
+            tft.drawRect(x + 3, y + 3, btnW - 6, btnH - 6, TFT_YELLOW); /**< Thicker highlight */
+        }
+
+        /* Text Contrast Logic */
+        uint16_t textColor = (bgColor > 0x7BEF) ? TFT_BLACK : TFT_WHITE;
+        tft.setTextColor(textColor);
+        tft.setTextDatum(MC_DATUM);
+        tft.drawString(label, x + (btnW / 2), y + (btnH / 2), 2);
     }
     
     /* 3. Footer hint */
