@@ -26,6 +26,11 @@ volatile bool newData = false;
 volatile int discoveredNodeCount = 0;
 volatile int selectedNodeIdx = 0;
 
+uint32_t tsLastTouch; /**< Timestamp of last cyd touch event */
+bool screenDim; /**< True if screen is dimmed */
+bool screenOff; /**< True if screen is off */
+
+
 ARGBNode discoveredNodes[MAX_ARGB_NODES];
 
 /* CAN interface status from main.cpp */
@@ -39,8 +44,12 @@ TaskHandle_t xTouchHandle = NULL;
 /* Variables for the color picker routines - from main.cpp*/
 DisplayMode currentMode = MODE_HOME; /**< Current display mode */
 
-/* can tx function in main.cpp */
+/* can tx function from main.cpp */
 extern void send_message(uint16_t msgid, uint8_t *data, uint8_t dlc);
+
+/* hardware pwm function from main.cpp */
+extern void handleHardwareBlink(uint8_t submodIdx, uint8_t pin, uint32_t freq, uint32_t duty = (LEDC_13BIT_50PCT));
+
 
 /* node ID for the data payload from main CPP */
 extern volatile uint8_t myNodeID[4];
@@ -67,6 +76,9 @@ void initCYD() {
     timeQueue = xQueueCreate(1, 10 * sizeof(char));
 
     Serial.println("CYD: Init");
+
+    screenOff = false; /* clear the screen off flag */
+    screenDim = false; /* clear the screen dim flag */
 
     /* Clear the discovered nodes array to prevent garbage data on UI */
     memset(discoveredNodes, 0, sizeof(discoveredNodes));
@@ -557,6 +569,14 @@ void TaskReadTouch(void * pvParameters) {
 
           /* Always give the mutex back! */
           xSemaphoreGive(spiSemaphore);
+
+          /* If the screen is dimmed or off, turn it back on */
+          if (screenDim || screenOff) {
+              screenDim = false;
+              screenOff = false;
+              /* Turn screen back on */
+              handleHardwareBlink(CYD_BACKLIGHT_IDX, CYD_BACKLIGHT, CYD_BACKLIGHT_PWM_HZ, LEDC_13BIT_100PCT);
+          }
         }
       }
     } else {
@@ -566,6 +586,25 @@ void TaskReadTouch(void * pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(20)); /* High polling rate for touch */
   }
 }
+
+void cydScreenDimmer() {
+  const uint32_t currentTime = millis();
+
+  if (!screenOff) {
+    if (currentTime - tsLastTouch > SCREEN_OFF_MS) { 
+        /* Turn screen to minimum brightness */
+        handleHardwareBlink(CYD_BACKLIGHT_IDX, CYD_BACKLIGHT, CYD_BACKLIGHT_PWM_HZ, LEDC_13BIT_10PCT);
+        screenOff = true;
+        Serial.println("CYD: Screen to min. brightness.");
+    } else if ((currentTime - tsLastTouch > SCREEN_DIM_MS) && !screenDim) {
+        /* Dim to 50% */
+        handleHardwareBlink(CYD_BACKLIGHT_IDX, CYD_BACKLIGHT, CYD_BACKLIGHT_PWM_HZ, LEDC_13BIT_50PCT); 
+        screenDim = true;
+        Serial.println("CYD: Screen dimmed.");
+    }
+ }
+}
+
 
 /** Task 2: Update Display */
 void TaskUpdateDisplay(void * pvParameters) {
@@ -610,11 +649,13 @@ void TaskUpdateDisplay(void * pvParameters) {
 
     /* STATE 2: Normal UI Operation */
     /* 1000ms Refresh Loop */
-    if (currentMillis - lastTimeUpdate >= 1000) {
-        lastTimeUpdate = currentMillis;
+    if (currentMillis - lastTimeUpdate >= 1000) { /* The one-second loop */
 
         /* Check for stale nodes */
         lastTimeUpdate = currentMillis;
+
+        /* Check if we need to dim the screen */
+        cydScreenDimmer();
 
         bool stateChanged = false;
         for (int i = 0; i < 5; i++) {
@@ -647,6 +688,7 @@ void TaskUpdateDisplay(void * pvParameters) {
         
         if (currentTime - lastPressTime > debounceDelay) {
             lastPressTime = currentTime; // Move debounce lock to the start
+            tsLastTouch = currentTime; /* Keep track of last touch for screen dimming */
 
             /**
              * @section Header Processing

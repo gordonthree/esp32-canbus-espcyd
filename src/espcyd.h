@@ -54,8 +54,19 @@
 #define CYD_LDR           34
 #define CYD_SPEAKER       26
 
-/** ARGB constants */
+/** Mamiumum number of ARGB nodes for the color picker */
 #define MAX_ARGB_NODES    8
+
+/** Submodule index for backlight */
+#define CYD_BACKLIGHT_IDX 1 
+
+/** PWM frequency for backlight pwm in Hz */
+#define CYD_BACKLIGHT_PWM_HZ  1000
+
+#define SCREEN_DIM_MS 10000 /**< 10 seconds screen dims */
+#define SCREEN_OFF_MS 60000 /**< 1 minute screen off */
+
+
 
 /* Externalized variables for use in main logic if needed */
 extern TFT_eSPI tft;
