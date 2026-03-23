@@ -1,4 +1,3 @@
-#include <WiFi.h>
 #include "espcyd.h"
 
 /* espcyd.cpp */
@@ -10,6 +9,21 @@ XPT2046_Touchscreen touchscreen(XPT2046_CS, XPT2046_IRQ);
 SemaphoreHandle_t spiSemaphore;
 QueueHandle_t touchQueue;
 QueueHandle_t timeQueue;
+
+/* === Callbacks === */
+static send_message_cb_t send_message_cb = nullptr;
+static backlight_cb_t backlight_cb = nullptr;
+
+void espcyd_set_send_message_callback(send_message_cb_t cb) 
+{
+    send_message_cb = cb;
+}
+
+void espcyd_set_backlight_callback(backlight_cb_t cb) 
+{
+    backlight_cb = cb;
+}
+
 
 /* Forward declarations for tasks */
 void TaskReadTouch(void * pvParameters);
@@ -45,10 +59,10 @@ TaskHandle_t xTouchHandle = NULL;
 DisplayMode currentMode = MODE_HOME; /**< Current display mode */
 
 /* can tx function from main.cpp */
-extern void send_message(uint16_t msgid, uint8_t *data, uint8_t dlc);
+// extern void send_message(uint16_t msgid, uint8_t *data, uint8_t dlc);
 
 /* hardware pwm function from main.cpp */
-extern void handleHardwareBlink(uint8_t submodIdx, uint8_t pin, uint32_t freq, uint32_t duty = (LEDC_13BIT_50PCT));
+// extern void handleHardwareBlink(uint8_t submodIdx, uint8_t pin, uint32_t freq, uint32_t duty = (LEDC_13BIT_50PCT));
 
 
 /* node ID for the data payload from main CPP */
@@ -575,7 +589,7 @@ void TaskReadTouch(void * pvParameters) {
               screenDim = false;
               screenOff = false;
               /* Turn screen back on */
-              handleHardwareBlink(CYD_BACKLIGHT_IDX, CYD_BACKLIGHT, CYD_BACKLIGHT_PWM_HZ, LEDC_13BIT_100PCT);
+              backlight_cb(CYD_BACKLIGHT_IDX, CYD_BACKLIGHT, CYD_BACKLIGHT_PWM_HZ, LEDC_13BIT_100PCT);
           }
         }
       }
@@ -593,12 +607,12 @@ void cydScreenDimmer() {
   if (!screenOff) {
     if (currentTime - tsLastTouch > SCREEN_OFF_MS) { 
         /* Turn screen to minimum brightness */
-        handleHardwareBlink(CYD_BACKLIGHT_IDX, CYD_BACKLIGHT, CYD_BACKLIGHT_PWM_HZ, LEDC_13BIT_10PCT);
+        backlight_cb(CYD_BACKLIGHT_IDX, CYD_BACKLIGHT, CYD_BACKLIGHT_PWM_HZ, LEDC_13BIT_10PCT);
         screenOff = true;
         Serial.println("CYD: Screen to min. brightness.");
     } else if ((currentTime - tsLastTouch > SCREEN_DIM_MS) && !screenDim) {
         /* Dim to 50% */
-        handleHardwareBlink(CYD_BACKLIGHT_IDX, CYD_BACKLIGHT, CYD_BACKLIGHT_PWM_HZ, LEDC_13BIT_50PCT); 
+        backlight_cb(CYD_BACKLIGHT_IDX, CYD_BACKLIGHT, CYD_BACKLIGHT_PWM_HZ, LEDC_13BIT_50PCT); 
         screenDim = true;
         Serial.println("CYD: Screen dimmed.");
     }
@@ -742,7 +756,7 @@ void TaskUpdateDisplay(void * pvParameters) {
                             uint8_t canData[5];
                             memcpy(canData, (void*)myNodeID, 4);
                             canData[4] = (uint8_t)buttons[i].canID;
-                            send_message(SW_MOM_PRESS_ID, canData, SW_MOM_PRESS_DLC);
+                            send_message_cb(SW_MOM_PRESS_ID, canData, SW_MOM_PRESS_DLC);
 
                             vTaskDelay(pdMS_TO_TICKS(150)); 
 
@@ -781,7 +795,7 @@ void TaskUpdateDisplay(void * pvParameters) {
                             canData[4] = 0; // LED Strip/Index
                             canData[5] = (uint8_t)colorIdx;
 
-                            send_message(SET_ARGB_STRIP_COLOR_ID, canData, SET_ARGB_STRIP_COLOR_DLC);
+                            send_message_cb(SET_ARGB_STRIP_COLOR_ID, canData, SET_ARGB_STRIP_COLOR_DLC);
 
                             /* Trigger immediate redraw for the selection highlight */
                             if (xSemaphoreTake(spiSemaphore, pdMS_TO_TICKS(100)) == pdTRUE) {

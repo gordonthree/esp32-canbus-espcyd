@@ -1,17 +1,15 @@
-#ifndef ESPCYD_H_
-#define ESPCYD_H_
+#pragma once
+
 #include <Arduino.h>
 #include <ArduinoOTA.h>
 #include <SPI.h>
+#include <WiFi.h>
 
 #include "driver/twai.h" /**< Required for twai_status_info_t and twai_get_status_info() */
-#include <WiFi.h>        /**< Required for WiFi.RSSI() and WiFi.SSID() */
 
 #include "time.h"
 
-#ifndef CANBUS_PROJECT_H
 #include "canbus_project.h"
-#endif
 
 /* my colors */
 #if defined(ARGB_LED) || defined(ESP32CYD)
@@ -66,6 +64,12 @@
 #define SCREEN_DIM_MS 10000 /**< 10 seconds screen dims */
 #define SCREEN_OFF_MS 60000 /**< 1 minute screen off */
 
+/* === Callback functions === */
+typedef void (*send_message_cb_t)(uint16_t id, uint8_t *data, uint8_t dlc);
+typedef void (*backlight_cb_t)(uint8_t idx, uint8_t pin, uint32_t freq, uint32_t duty);
+
+extern void espcyd_set_send_message_callback(send_message_cb_t cb);
+extern void espcyd_set_backlight_callback(backlight_cb_t cb);
 
 
 /* Externalized variables for use in main logic if needed */
@@ -144,4 +148,3 @@ extern volatile int   discoveredNodeCount; /**< Track active count in the array 
 extern volatile int   selectedNodeIdx;
 extern ARGBNode discoveredNodes[MAX_ARGB_NODES]; /**< Size must be explicit here */
 
-#endif  /* End ESPCYD_H_ */
