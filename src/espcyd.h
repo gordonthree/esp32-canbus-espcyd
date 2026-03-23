@@ -1,14 +1,16 @@
 #pragma once
 
+/* === Framework includes === */
 #include <Arduino.h>
 #include <ArduinoOTA.h>
 #include <SPI.h>
 #include <WiFi.h>
 
+/* === ESP32 native IDF includes === */
 #include "driver/twai.h" /**< Required for twai_status_info_t and twai_get_status_info() */
-
 #include "time.h"
 
+/* My project includes */
 #include "canbus_project.h"
 
 /* my colors */
@@ -26,6 +28,7 @@
 *   Note: this library doesn't require further configuration */
 #include <XPT2046_Touchscreen.h>
 
+/* === Macros and Constants === */
 
 /** Touchscreen pins, this is setup in build_flags in platformio.ini */
 #define XPT2046_IRQ 36   /* T_IRQ */
@@ -64,87 +67,141 @@
 #define SCREEN_DIM_MS 10000 /**< 10 seconds screen dims */
 #define SCREEN_OFF_MS 60000 /**< 1 minute screen off */
 
+
 /* === Callback functions === */
 typedef void (*send_message_cb_t)(uint16_t id, uint8_t *data, uint8_t dlc);
 typedef void (*backlight_cb_t)(uint8_t idx, uint8_t pin, uint32_t freq, uint32_t duty);
 
+/* === Callback pointers (extern declarations) === */
+extern send_message_cb_t send_message_cb;
+extern backlight_cb_t    backlight_cb;
+
 extern void espcyd_set_send_message_callback(send_message_cb_t cb);
 extern void espcyd_set_backlight_callback(backlight_cb_t cb);
 
+/* === Typedefs === */
 
-/* Externalized variables for use in main logic if needed */
+typedef enum  { 
+    MODE_HOME = 0 , 
+    MODE_COLOR_PICKER = 1, 
+    MODE_NODE_SEL = 2, 
+    MODE_SYSTEM_INFO = 3, 
+    MODE_HAMBURGER_MENU = 4
+} cydDisplayMode_t; /**< UI state - current display mode */
+
+typedef struct {
+  int x;
+  int y;
+  int z;
+} touchData_t;
+
+typedef struct {
+    int x, y, w, h;
+    char label[10];
+    uint16_t canID;
+    uint16_t color;
+} keyPadButtons_t;
+
+typedef struct {
+    const char* label;
+    uint16_t color;
+    void (*drawIcon)(int x, int y);
+} gridItem_t; /**< Container for button metadata to be used in drawUnifiedGrid */
+
+typedef struct {
+    uint32_t id;       /**< 32-bit Node ID */
+    uint32_t lastSeen; /**< Heartbeat timestamp */
+    int lastColorIdx;  /**< Last color index sent to this node */
+    bool active;       /**< Status flag */
+} argbNode_t; /**< Describe an ARGB node */
+
+
+/* === Global Variables === */
 extern TFT_eSPI tft;
-
 extern String wifiIP; /**< Refers to the String defined in main.cpp */
 
-
 /* Task handles */
-extern TaskHandle_t xDisplayHandle; /* task in espcyd.cpp */
-extern TaskHandle_t xTouchHandle;   /* task in espcyd.cpp */
+extern TaskHandle_t xDisplayHandle; /* task in espcyd_task_display.cpp */
+extern TaskHandle_t xTouchHandle;   /* task in espcyd_task_touch.cpp */
 
+/* Library global variables for inter-task communication */
+extern SPIClass touchscreenSPI;
+extern XPT2046_Touchscreen touchscreen;
 
-/* Set X and Y coordinates for center of display */
-const int centerX = SCREEN_WIDTH / 2;
-const int centerY = SCREEN_HEIGHT / 2;
+extern SemaphoreHandle_t spiSemaphore;
+extern QueueHandle_t touchQueue;
+extern QueueHandle_t timeQueue;
 
-/* Modular initialization function */
-void initCYD();
-// void registerARGBNode(uint32_t id);
+extern uint32_t tsLastTouch; /**< Timestamp of last cyd touch event */
+extern bool screenOff; /**< True if screen is off */
+extern bool screenDim; /**< True if screen is dimmed */
 
+/* Menu items for the hamburger menu */
+extern const char* const menuLabels[];
+
+/* UI state variables */
+extern keyPadButtons_t buttons[4];
+extern cydDisplayMode_t currentMode;
+
+extern volatile int   discoveredNodeCount; /**< Track active count in the array */
+extern volatile int   selectedNodeIdx;
+extern argbNode_t     discoveredNodes[MAX_ARGB_NODES]; /**< Size must be explicit here */
+
+/* ========================================================================= */
+/* Local functions and prototypes 
+/* ========================================================================= */
 
 /**
  * @brief Converts a NeoPixelBus RgbColor to a 16-bit RGB565 value for the TFT.
  * @param color The RgbColor to convert.
  * @return uint16_t The color in RGB565 format.
  */
-uint16_t colorTo565(PaletteColor color);
+static inline uint16_t colorTo565(PaletteColor color) 
+{
+    /* Scale 8-bit color channels to 5-6-5 bit depths */
+    return ((color.R & 0xF8) << 8) | ((color.G & 0xFC) << 3) | (color.B >> 3);
+}
 
-struct TouchData {
-  int x;
-  int y;
-  int z;
-};
 
-struct KeypadButton {
-    int x, y, w, h;
-    char label[10];
-    uint16_t canID;
-    uint16_t color;
-};
+/* Main functions */
+void initCYD();
 
-/**
- * @struct GridItem
- * @brief Container for button metadata to be used in drawUnifiedGrid
- */
-struct GridItem {
-    const char* label;
-    uint16_t color;
-    void (*drawIcon)(int x, int y);
-};
+/* === Draw functions === */
 
-extern KeypadButton buttons[4];
+/* Main screens */
+void drawColorPicker();
+void drawSplashScreen(const char* message);
+void drawKeypad();
+void drawSystemInfo();
+void drawNodeSelector();
 
-/** --- UI States --- */
-enum DisplayMode { MODE_HOME = 0 , 
-                   MODE_COLOR_PICKER = 1, 
-                   MODE_NODE_SEL = 2, 
-                   MODE_SYSTEM_INFO = 3, 
-                   MODE_HAMBURGER_MENU = 4
-                };
-extern DisplayMode currentMode;
+/* Icons and elements */
+void drawInfoIcon(int x, int y);
+void drawNetworkIcon(int x, int y);
+void drawPaletteIcon(int x, int y);
+void drawHomeIcon(int x, int y);
+void drawWiFiStatus(int32_t rssi);
+void drawHamburgerIcon();
+void drawLightbarIcon(int x, int y);
+void drawSeatWarmerIcon(int x, int y);
+void drawWaterPumpIcon(int x, int y);
+void drawDefrosterIcon(int x, int y);
+void drawPickerIcon();
+void drawHamburgerMenu();
 
-/**
- * @struct ARGBNode
- * @brief Represents a discovered remote ARGB controller
- */
-struct ARGBNode {
-    uint32_t id;       /**< 32-bit Node ID */
-    uint32_t lastSeen; /**< Heartbeat timestamp */
-    int lastColorIdx;  /**< Last color index sent to this node */
-    bool active;       /**< Status flag */
-};
+/* Header and footer */
+void drawFooter();
+void drawHeader(const char* title);
 
-extern volatile int   discoveredNodeCount; /**< Track active count in the array */
-extern volatile int   selectedNodeIdx;
-extern ARGBNode discoveredNodes[MAX_ARGB_NODES]; /**< Size must be explicit here */
+/* Toolbox functions*/
+void drawUnifiedGrid(const char* title, gridItem_t* items);
+void refreshCurrentScreen();
 
+/* === Display and Touch screen functions === */
+
+/* Touch functions */
+void TaskReadTouch(void * pvParameters);
+void cydScreenDimmer();
+
+/* Display functions */
+void TaskUpdateDisplay(void * pvParameters);
