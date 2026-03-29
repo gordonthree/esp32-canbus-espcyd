@@ -1,4 +1,5 @@
 #include "espcyd.h"
+#include "can_platform.h"
 
 /* espcyd.cpp */
 
@@ -73,6 +74,26 @@ extern bool wifi_connected;
 bool screenOff = false; /* clear the screen off flag */
 bool screenDim = false; /* clear the screen dim flag */
 
+void initCydHardware()
+{
+  /* Initialize the LED pins */
+  gpio_reset_pin((gpio_num_t)LED_BLUE);
+  gpio_reset_pin((gpio_num_t)LED_RED);
+  gpio_reset_pin((gpio_num_t)LED_GREEN);
+  gpio_reset_pin((gpio_num_t)CYD_BACKLIGHT);
+
+  gpio_set_direction((gpio_num_t)LED_BLUE, GPIO_MODE_OUTPUT); // pinMode(LED_BLUE, OUTPUT);
+  gpio_set_direction((gpio_num_t)LED_RED, GPIO_MODE_OUTPUT); // pinMode(LED_RED, OUTPUT);
+  gpio_set_direction((gpio_num_t)LED_GREEN, GPIO_MODE_OUTPUT); // pinMode(LED_GREEN, OUTPUT);
+  gpio_set_direction((gpio_num_t)CYD_BACKLIGHT, GPIO_MODE_OUTPUT); // pinMode(CYD_BACKLIGHT, OUTPUT);
+
+  gpio_set_level((gpio_num_t)LED_BLUE, HIGH); // digitalWrite(LED_BLUE, HIGH); /* reverse logic, high equals off */
+  gpio_set_level((gpio_num_t)LED_RED, HIGH); // digitalWrite(LED_RED, HIGH);
+  gpio_set_level((gpio_num_t)LED_GREEN, HIGH); // digitalWrite(LED_GREEN, HIGH);
+  gpio_set_level((gpio_num_t)CYD_BACKLIGHT, HIGH); // digitalWrite(CYD_BACKLIGHT, HIGH);
+
+}
+
 void initCYD() {
     spiSemaphore = xSemaphoreCreateBinary(); /* semaphore to control SPI access */
     xSemaphoreGive(spiSemaphore); /* unlock SPI access */
@@ -80,14 +101,13 @@ void initCYD() {
     touchQueue = xQueueCreate(5, sizeof(touchData_t));
     timeQueue = xQueueCreate(1, 10 * sizeof(char));
 
-    Serial.println("CYD: Init");
+    Serial.println("[CYD] Initializing...");
+
+    initCydHardware();
 
     /* Clear the discovered nodes array to prevent garbage data on UI */
     memset(discoveredNodes, 0, sizeof(discoveredNodes));
 
-    /* Power on the backlight */
-    pinMode(CYD_BACKLIGHT, OUTPUT);
-    digitalWrite(CYD_BACKLIGHT, HIGH);
 
     tft.begin(); /* initialize the display */
     tft.setRotation(1);

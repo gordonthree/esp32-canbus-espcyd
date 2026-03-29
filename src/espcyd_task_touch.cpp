@@ -23,12 +23,12 @@ void cydScreenDimmer()
         /* Turn screen to minimum brightness */
         backlight_cb(CYD_BACKLIGHT_IDX, CYD_BACKLIGHT, CYD_BACKLIGHT_PWM_HZ, LEDC_13BIT_10PCT);
         screenOff = true;
-        Serial.println("CYD: Screen to min. brightness.");
+        Serial.println("[CYD] Screen to min. brightness.");
     } else if ((currentTime - tsLastTouch > SCREEN_DIM_MS) && !screenDim) {
         /* Dim to 50% */
         backlight_cb(CYD_BACKLIGHT_IDX, CYD_BACKLIGHT, CYD_BACKLIGHT_PWM_HZ, LEDC_13BIT_50PCT); 
         screenDim = true;
-        Serial.println("CYD: Screen dimmed.");
+        Serial.println("[CYD] Screen dimmed.");
     }
  }
 }
@@ -40,7 +40,7 @@ void cydScreenDimmer()
 void TaskReadTouch(void * pvParameters) 
 {
   touchData_t currentTouch;
-  Serial.println("CYD: Touch Task Started");
+  Serial.println("[CYD] Touch Task Started");
 
   for(;;) {
     /* Only process touch if CAN is healthy and not suspended */

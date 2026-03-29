@@ -48,12 +48,12 @@
 #define FONT_SIZE 2
 
 /** Cheap yellow display pin assignments */
-#define LED_RED           4                
-#define LED_BLUE          17
-#define LED_GREEN         16
-#define CYD_BACKLIGHT     21 
-#define CYD_LDR           34
-#define CYD_SPEAKER       26
+#define LED_RED           (4U)               
+#define LED_BLUE          (17U)
+#define LED_GREEN         (16U)
+#define CYD_BACKLIGHT     (21U) 
+#define CYD_LDR           (34U)
+#define CYD_SPEAKER       (26U)
 
 /** Mamiumum number of ARGB nodes for the color picker */
 #define MAX_ARGB_NODES    8

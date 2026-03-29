@@ -29,7 +29,7 @@ void TaskUpdateDisplay(void * pvParameters)
   struct tm timeinfo;
   char timeString[10];
 
-  Serial.println("CYD: Display Task Started");
+  Serial.println("[CYD] Display Task Started");
 //   digitalWrite(LED_BLUE, LOW); /* Turn on the blue LED */
 
   for(;;) {
