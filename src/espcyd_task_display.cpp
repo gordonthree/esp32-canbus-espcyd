@@ -67,7 +67,7 @@ void TaskUpdateDisplay(void * pvParameters)
                 if (discoveredNodes[i].active && (currentMillis - discoveredNodes[i].lastSeen > 30000)) {
                     discoveredNodes[i].active = false;
                     stateChanged = true;
-                    Serial.printf("Node 0x%08X timed out.\n", discoveredNodes[i].id);
+                    Serial.printf("Node 0x%08X timed out.", discoveredNodes[i].id);
                 }
             }
         }
